@@ -42,7 +42,7 @@ interface Question { //Define interface for question
 const CourseDetail: React.FC = () => {
   const { courseId } = useLocalSearchParams<{ courseId?: string }>();
   const [courseData, setCourseData] = useState<CourseData | null>(null);
-  const [activeTab, setActiveTab] = useState<'stream' | 'work' | 'people'>('stream');
+  const [activeTab, setActiveTab] = useState<'stream' | 'question' | 'people'>('stream');
     const [people, setPeople] = useState<Record<string, Person>>({});  // Store people as an object
     const [questions, setQuestions] = useState<Record<string,Question>>({});
   const [loading, setLoading] = useState(true);
@@ -213,16 +213,13 @@ const CourseDetail: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Course Details</Text>
-      </View>
 
       <View style={styles.tabs}>
         <TouchableOpacity onPress={() => setActiveTab('stream')}>
           <Text style={[styles.tab, activeTab === 'stream' && styles.activeTab]}>Stream</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab('work')}>
-          <Text style={[styles.tab, activeTab === 'work' && styles.activeTab]}>Work</Text>
+        <TouchableOpacity onPress={() => setActiveTab('question')}>
+          <Text style={[styles.tab, activeTab === 'question' && styles.activeTab]}>Question</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => setActiveTab('people')}>
           <Text style={[styles.tab, activeTab === 'people' && styles.activeTab]}>People</Text>
@@ -247,20 +244,15 @@ const CourseDetail: React.FC = () => {
                 <FontAwesomeIcon icon={faPlus} size={20} color="white" />
                 <Text style={styles.buttonText}>  Add Question</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity style={styles.button} onPress={handleAddPeople}>
-                <FontAwesomeIcon icon={faUserPlus} size={20} color="white" />
-                <Text style={styles.buttonText}> Add People</Text>
-            </TouchableOpacity>
              <TouchableOpacity style={styles.button} onPress={() => router.back()}>
                 <Text style={styles.buttonText}>Go Back</Text>
             </TouchableOpacity>
         </View>
       )}
 
-      {activeTab === 'work' && (
+      {activeTab === 'question' && (
         <View style={styles.content}>
-            <Text style={styles.sectionHeader}>Work</Text>
+            <Text style={styles.sectionHeader}>Question</Text>
           {/* Display Questions */}
           {Object.keys(questions).length > 0 ? (
             Object.entries(questions).map(([questionId, question]) => (
@@ -268,16 +260,6 @@ const CourseDetail: React.FC = () => {
                     <Text style={styles.questionTitle}>{question.title}</Text>
                     <Text style={styles.questionDetails}>{question.details}</Text>
                     <Text style={styles.questionTimestamp}>{question.timestamp}</Text>
-                    <View style={styles.questionActions}>
-                         <TouchableOpacity style={[styles.button, styles.editButton]} onPress={()=> editQuestion(questionId)}>
-                            <FontAwesomeIcon icon={faEdit} size={20} color="white"/>
-                            <Text style={styles.buttonText}>Edit</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={()=> deleteQuestion(questionId)}>
-                            <FontAwesomeIcon icon={faTrash} size={20} color="white"/>
-                            <Text style={styles.buttonText}>Delete</Text>
-                        </TouchableOpacity>
-                    </View>
                 </View>
             ))
           ) : (
