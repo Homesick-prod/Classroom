@@ -133,9 +133,10 @@ const Dashboard: React.FC<Props> = () => {
   const handleAddCourse = () => {
       router.push('/addCourse');
   }
-    const handleQuestion = (courseId: string) => {
-    router.replace(`/askQuestion?=${courseId}`);
-    };
+    const handleQuestion = (courseId: string) => {
+    // **CORRECTED**: Added / before askQuestion
+    router.push(`/askQuestion?courseId=${courseId}`); // Pass courseId
+  };
     const handleEditCourse = (courseId: string) => {
     router.push(`/editCourse?courseId=${courseId}`);
   };
@@ -234,10 +235,6 @@ const Dashboard: React.FC<Props> = () => {
               )}
 
               <View style={styles.buttonContainer}>
-                <TouchableOpacity style={[styles.button, styles.qrCodeButton]} onPress={() => handleQRCode(course.courseId)}>
-                  <FontAwesomeIcon icon={faQrcode} size={20} color="white" />
-                  <Text style={styles.buttonText}>QR Code</Text>
-                </TouchableOpacity>
                 <TouchableOpacity style={[styles.button, styles.questionButton]} onPress={() => handleQuestion(course.courseId)}>
                   <FontAwesomeIcon icon={faQuestion} size={20} color="white" />
                     <Text style={styles.buttonText}>Question</Text>
@@ -245,10 +242,6 @@ const Dashboard: React.FC<Props> = () => {
                 <TouchableOpacity style={[styles.button, styles.attendanceButton]} onPress={() => handleAttendance(course.courseId)}>
                   <FontAwesomeIcon icon={faCheckSquare} size={20} color="white" />
                   <Text style={styles.buttonText}>Attendance</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, styles.editButton]} onPress={() => handleEditCourse(course.courseId)}>
-                  <FontAwesomeIcon icon={faEdit} size={20} color="white" />
-                    <Text style={styles.buttonText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={() => handleDeleteCourse(course.courseId)}>
                   <FontAwesomeIcon icon={faTrash} size={20} color="white" />
@@ -357,7 +350,7 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap', // Allow buttons to wrap
-    justifyContent: 'space-between', // Space out buttons
+    justifyContent: 'space-evenly', // Space out buttons
     marginTop: 10,
   },
   button: {
@@ -367,7 +360,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '30%',         // ~30% width for 3 columns
+    width: '40%',         // ~30% width for 3 columns
   },
     buttonText: {
     color: 'white',
@@ -384,15 +377,19 @@ const styles = StyleSheet.create({
     },
     questionButton: {
         backgroundColor: '#F3558AFF',
+        width: '40%',
     },
     attendanceButton: {
         backgroundColor: '#5762A4FF',
+        width: '40%',
     },
     editButton: {
         backgroundColor: '#2CBFAE',
+        
     },
     deleteButton: {
         backgroundColor: '#DC3529FF',
+        width: '40%',
     },
   goToCourseButton:{
         backgroundColor: '#F57F5BFF'

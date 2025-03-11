@@ -1,4 +1,3 @@
-// askQuestion.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,9 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getDatabase, ref, push } from 'firebase/database';
+import { getDatabase, ref, push, set, get } from 'firebase/database'; //Import get
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import app from './firebase'; // Import your Firebase configuration
 
@@ -43,46 +41,62 @@ const AskQuestion: React.FC<Props> = () => {
     try {
       const user = auth.currentUser;
       if (!user) {
-          Alert.alert("Error", "User not signed in.");
-          return;
+        Alert.alert("Error", "User not signed in.");
+        return;
       }
 
       if (!courseId) {
-          Alert.alert("Error", "No course selected.");
-          router.replace('/dashboard')
-          return;
+        Alert.alert("Error", "No course selected.");
+        router.back();
+        return;
       }
 
       const questionsRef = ref(db, `questions/${courseId}`);
-      await push(questionsRef, {
+      const newQuestionRef = push(questionsRef); // Generate unique ID
+      const questionId = newQuestionRef.key;
+      if(!questionId) return;
+
+      // Get user data for display name
+      const userRef = ref(db, `users/${user.uid}`);
+      const userSnapshot = await get(userRef);  // Use the imported get function
+
+      if (!userSnapshot.exists()) { //Check user data
+        Alert.alert("Error", "User data not found.");
+        return;
+      }
+        const userData = userSnapshot.val();
+        const userName = userData.name || 'Anonymous'; // Use the username if not empty.
+
+
+      await set(newQuestionRef, { // Use set with newQuestionRef
         title: title,
         details: details,
         timestamp: new Date().toISOString(),
-        userId: user.uid, // Store the user ID
-        userName: user.displayName || 'Anonymous', // Store user's display name or a default
+        userId: user.uid,
+        userName: userName, // Store display name
+        questionId: questionId //store question id
       });
 
       Alert.alert('Success', 'Your question has been submitted successfully!');
-      router.replace('/dashboard') // Go back to the previous screen (likely the course detail)
+      router.back(); // Go back to the previous screen
 
-
-    } catch (error:any) {
+    } catch (error: any) {
       console.error('Error submitting question:', error);
       Alert.alert('Error', `Failed to submit question: ${error.message}`);
     }
   };
 
     const handleCancel = () => {
-        router.replace('/dashboard')
+        router.back();
     }
 
 
   return (
     <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"} // Adjust behavior based on OS
-        style={styles.container}
-        >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+      <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.formContainer}>
           <Text style={styles.header}>Ask a Question</Text>
 
@@ -91,7 +105,8 @@ const AskQuestion: React.FC<Props> = () => {
             placeholder="Question Title"
             value={title}
             onChangeText={setTitle}
-            required
+             placeholderTextColor="#9e9e9e"
+            required  // Consider making fields required
           />
 
           <TextInput
@@ -107,26 +122,22 @@ const AskQuestion: React.FC<Props> = () => {
           <TouchableOpacity style={styles.button} onPress={submitQuestion}>
             <Text style={styles.buttonText}>Submit Question</Text>
           </TouchableOpacity>
-           <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCancel}>
+          <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCancel}>
                 <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
         </View>
       </ScrollView>
-     </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
+        flexGrow: 1, // Important:  Use flexGrow with ScrollView
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: '#E0E7E9',
-        justifyContent: 'center', // Vertically center (for KeyboardAvoidingView)
-    },
-    scrollContainer: {
-      flexGrow: 1, // Important for ScrollView to work within KeyboardAvoidingView
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingTop: 50,
+        paddingTop: 50, // Adjust if you have a header/tabs
     },
     formContainer: {
         backgroundColor: 'white',
@@ -135,46 +146,51 @@ const styles = StyleSheet.create({
         maxWidth: 500,   // Limit maximum width
         borderRadius: 8,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 5, // for Android shadow
+        shadowRadius: 4,
+        elevation: 5, // For Android shadow
+        alignItems: 'center' // Center the content horizontally.
     },
-  header: {
-    marginBottom: 20, // Added a bit more margin
-    color: '#354649',
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center', // Ensure text is centered
-  },
-  input: {
-    width: '100%',
-    padding: 12,
-    marginVertical: 10, // Use marginVertical for top/bottom spacing
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-     textAlign: 'center',
-  },
-  textArea: {
-    height: 150, // More appropriate height for a text area
-    textAlignVertical: 'top', // Important for multiline text
-  },
-  button: {
-    backgroundColor: '#2CBFAE',
-    padding: 12,
-    borderRadius: 5,
-    marginTop: 10,
-    alignItems: 'center', // Center text horizontally
-  },
-    cancelButton: {
-     backgroundColor: '#808080',
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+    header: {
+        marginBottom: 30,       // More margin
+        color: '#354649',
+        fontSize: 24,
+        fontWeight: 'bold',
+        textAlign: 'center' // Add this
+    },
+    input: {
+        width: '100%',
+        padding: 12,
+        marginVertical: 10,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 5,
+        textAlign: 'center',
+        fontSize: 16 // Good practice to set font size
+    },
+    textArea: {
+        height: 150, // More appropriate height for a text area
+        textAlignVertical: 'top', // Important for multiline text
+    },
+   button: {
+        backgroundColor: '#2CBFAE',
+        padding: 15, // Make button larger
+        borderRadius: 8,
+        width: '100%', // Full width within its container
+         marginTop: 10,
+         alignItems: 'center'
+    },
+     cancelButton: {
+        backgroundColor: '#808080', // Different color for cancel
+         marginTop: 20,
+    },
+    buttonText: {
+        color: 'white',
+        textAlign: 'center',
+        fontSize: 18,          // Make font size consistent
+        fontWeight: 'bold'    // Add some weight
+    },
 
 });
 

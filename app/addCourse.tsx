@@ -10,9 +10,11 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getDatabase, ref, set, onValue, off, get } from 'firebase/database'; // Import get!
+import { getDatabase, ref, set, onValue, off, get } from 'firebase/database';
 import { useRouter } from 'expo-router';
 import app from './firebase';
+// Import Ionicons or another icon library of your choice
+import { Ionicons } from '@expo/vector-icons';
 
 interface Course {
   courseId: string;
@@ -73,8 +75,7 @@ const AddCourse: React.FC<Props> = () => {
     try {
       const userCourseRef = ref(db, `users/${user.uid}/classroom/${courseId}`);
 
-      // Check if the course already exists (using the imported get function)
-      const existingCourseSnapshot = await get(userCourseRef); // Use get here
+      const existingCourseSnapshot = await get(userCourseRef);
       if (existingCourseSnapshot.exists()) {
         Alert.alert("Error", "This course is already in your list.");
         return;
@@ -121,6 +122,14 @@ const AddCourse: React.FC<Props> = () => {
           </View>
         )}
       />
+      {/* Back Button */}
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.replace('/dashboard')} // Use router.replace
+      >
+        <Ionicons name="arrow-back" size={24} color="white" />
+        <Text style={styles.backButtonText}>Back to Dashboard</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -173,7 +182,22 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontWeight: 'bold'
-  }
+  },
+  backButton: {  // Styles for the back button
+    flexDirection: 'row', // Arrange icon and text horizontally
+    backgroundColor: '#354649',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center', // Center the content
+    marginTop: 20,
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10, // Add space between icon and text
+  },
 });
 
 export default AddCourse;

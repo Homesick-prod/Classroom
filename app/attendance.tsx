@@ -7,316 +7,220 @@ import {
   Alert,
   ScrollView,
   Platform,
-  ActivityIndicator, // Import ActivityIndicator
+  ActivityIndicator // Import ActivityIndicator
 } from 'react-native';
-import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getDatabase, ref, get, set, onValue } from 'firebase/database'; // Import onValue
-import { Picker } from '@react-native-picker/picker';
+import { getDatabase, ref, set, get } from 'firebase/database'; // Remove onValue (not needed here)
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import app from './firebase';  // Import Firebase configuration
+import app from './firebase';
+import RNPickerSelect from 'react-native-picker-select'; // Import
 
 interface Props {}
 
 const AttendancePage: React.FC<Props> = () => {
-    const { courseId } = useLocalSearchParams<{ courseId?: string }>(); // Get courseId
-    const [courseData, setCourseData] = useState<{ name: string; classroom: string } | null>(null);
-  const [attendanceStatus, setAttendanceStatus] = useState('present'); // Default to 'present'
-  const [isAttendanceOpen, setIsAttendanceOpen] = useState(false);
-  const [attendanceList, setAttendanceList] = useState<string | null>(null);  //Store string
-    const [loading, setLoading] = useState(true);
-    const [loadingAttendance, setLoadingAttendance] = useState(false); //Separate loading
-
+  const [attendanceStatus, setAttendanceStatus] = useState<string>('present'); // Use string type
+  const [courseName, setCourseName] = useState('');
+  const { courseId } = useLocalSearchParams<{ courseId?: string }>();
+  const [loading, setLoading] = useState(true); // Loading state
 
   const router = useRouter();
   const auth = getAuth(app);
   const db = getDatabase(app);
 
- useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-          if (!courseId) {
-              Alert.alert("Error", "No course selected.");
-              router.back(); // Or redirect to a suitable screen
-              return;
-          }
-        await fetchCourseData(courseId);
-        // Removed handleAttendance(user.uid); call.  This is now handled on button press
-      } else {
-          Alert.alert("Error", "Please log in first.");
-            router.replace('/');
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.replace('/');
+        return; // Important: Return to prevent further execution
       }
-      setLoading(false); // Stop loading after authentication check
-    });
-      return () => unsubscribeAuth(); // Cleanup auth listener
-  }, [auth, courseId, router]);
 
-  const fetchCourseData = async (id: string) => {
+      if (!courseId) {
+        Alert.alert("Error", "No course selected.");
+        router.back();
+        return; // Important: Return to prevent further execution
+      }
 
+      // Fetch course name
+      const courseRef = ref(db, `courses/${courseId}`);
       try {
-        const courseRef = ref(db, `courses/${id}`);
         const snapshot = await get(courseRef);
         if (snapshot.exists()) {
-          const data = snapshot.val();
-          setCourseData(data);
+          const courseData = snapshot.val();
+          setCourseName(courseData.name);
         } else {
-          Alert.alert("Error", "Course data not found.");
-            setCourseData(null);
+          Alert.alert("Error", "Course not found.");
+          router.back();
+          return; // Important: Return after error
         }
       } catch (error: any) {
-        console.error("Error fetching course data:", error);
-        Alert.alert("Error", `Failed to fetch course data: ${error.message}`);
+        Alert.alert("Error", "Fetch course data error: " + error.message);
+        return; // Important: Return after error
+      } finally {
+          setLoading(false);
       }
-  };
+    });
 
-  const handleOpenAttendance = () => {
-    setIsAttendanceOpen(true);
-  };
-
-  const handleCloseAttendance = () => {
-    setIsAttendanceOpen(false);
-  };
-
- const handleShowAttendance = async () => {
-     setLoadingAttendance(true); // Start loading
-    try {
-        if (!courseId) {
-            Alert.alert("Error", "Course ID is missing.");
-            setAttendanceList(null)
-            return;
-        }
-        const attendanceRef = ref(db, `attendances/${courseId}`);
-        const snapshot = await get(attendanceRef);  // Use a one-time 'get'
-        if (snapshot.exists()) {
-            let listContent = '';
-            const data = snapshot.val();
-             for (let date in data) {
-                listContent += `\n${date}\n`; // Use \n for newlines in React Native Text
-                for (let userId in data[date]) {  // Corrected: iterate over userId
-                   const userRef = ref(db, `users/${userId}`); //Get userName
-                    const userSnapshot = await get(userRef);
-                    const userData = userSnapshot.val();
-                    const userName = userData ? userData.displayName || 'Unknown User' : 'Unknown User'; //display Name
-                  listContent += `${userName}: ${data[date][userId]}\n`; // Display user's status
-                }
-              }
-            setAttendanceList(listContent);
-
-        } else {
-            setAttendanceList("No attendance data found.");
-        }
-    } catch (error: any) {
-        console.error("Error fetching attendance data:", error);
-        Alert.alert("Error", `Failed to fetch attendance: ${error.message}`);
-        setAttendanceList(null);
-    } finally {
-        setLoadingAttendance(false)
-    }
-};
-
+    return () => unsubscribe();
+  }, [auth, db, router, courseId]);
 
   const handleAttendanceSubmit = async () => {
-      try {
-          const user = auth.currentUser;
-          if (!user) {
-              Alert.alert("Error", "User not signed in.");
-              return;
-          }
-
-          if (!courseId) {
-              Alert.alert("Error", "No course selected.");
-              return;
-          }
-
-          const today = new Date().toLocaleDateString();
-          const attendanceRef = ref(db, `attendances/${courseId}/${today}/${user.uid}`);
-          await set(attendanceRef, attendanceStatus);
-          Alert.alert("Success", "Attendance recorded successfully!");
-          // No need to navigate here; stay on the same page
-      } catch (error: any) {
-          console.error("Error submitting attendance:", error);
-          Alert.alert("Error", `Failed to submit attendance: ${error.message}`);
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        Alert.alert("Error", "User not signed in.");
+        return; // Important: Return to prevent further execution
       }
-    };
+
+      if (!courseId) {
+        Alert.alert("Error", "No course selected.");
+        return; // Important: Return to prevent further execution
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const attendanceRef = ref(db, `attendances/${courseId}/${today}/${user.uid}`);
+      await set(attendanceRef, {
+        status: attendanceStatus,
+        timestamp: new Date().toISOString(),
+        userName: user.displayName || 'Anonymous',
+      });
+
+      Alert.alert('Success', 'Attendance recorded successfully!');
+    } catch (error: any) {
+      console.error('Error submitting attendance:', error);
+      Alert.alert('Error', `Failed to submit attendance: ${error.message}`);
+    }
+  };
+
+    const handleBack = () => {
+        router.back();
+    }
 
     if (loading) {
-    return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#2CBFAE" />
-      </View>
-    );
-  }
+        return (
+        <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2CBFAE"/>
+        </View>
+        );
+    }
 
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.contentContainer}>
-        <Text style={styles.header}>Attendance System</Text>
 
-        <View style={styles.courseInfo}>
-          <Text style={styles.courseInfoHeader}>Course Information</Text>
-          {courseData ? (
-            <>
-              <Text style={styles.courseName}>{courseData.name}</Text>
-              <Text style={styles.classroom}>Classroom: {courseData.classroom}</Text>
-            </>
-          ) : (
-            <Text>Loading course data...</Text>
-          )}
-        </View>
+      <View style={styles.formContainer}>
+       <Text style={styles.header}>Attendance for {courseName}</Text>
+        <Text style={styles.label}>Select Attendance Status:</Text>
+        <RNPickerSelect
+            onValueChange={(value) => setAttendanceStatus(value as string)} //Typescript casting
+            items={[
+                { label: 'Present', value: 'present' },
+                { label: 'Absent', value: 'absent' },
+                { label: 'Excused', value: 'excused' },
+            ]}
+            value={attendanceStatus} // Controlled component
+            style={pickerSelectStyles} // Use a separate style object
+            placeholder={{}} //Removes default place holder.
+            useNativeAndroidPickerStyle={false} // Important for consistent styling
 
-        <View style={styles.attendanceSection}>
-          <TouchableOpacity
-            style={[styles.button, !isAttendanceOpen ? styles.activeButton : null]}
-            onPress={handleOpenAttendance}
-            disabled={isAttendanceOpen}
-          >
-            <Text style={styles.buttonText}>Open Attendance</Text>
+        />
+
+        <TouchableOpacity style={styles.button} onPress={handleAttendanceSubmit}>
+          <Text style={styles.buttonText}>Submit Attendance</Text>
+        </TouchableOpacity>
+
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <Text style={styles.buttonText}>Back</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, isAttendanceOpen ? styles.activeButton : null]}
-            onPress={handleCloseAttendance}
-            disabled={!isAttendanceOpen}
-          >
-            <Text style={styles.buttonText}>Close Attendance</Text>
-          </TouchableOpacity>
-
-            <TouchableOpacity
-                style={[styles.button, isAttendanceOpen ? styles.activeButton : null]}  // Apply active style if open
-                onPress={handleShowAttendance}
-              >
-                <Text style={styles.buttonText}>Show Attendance</Text>
-              </TouchableOpacity>
-        </View>
-
-        {isAttendanceOpen && (
-          <View style={styles.form}>
-            <Text style={styles.formLabel}>Status:</Text>
-             <Picker
-                selectedValue={attendanceStatus}
-                style={styles.picker}
-                onValueChange={(itemValue) => setAttendanceStatus(itemValue)}
-                >
-                <Picker.Item label="Present" value="present" />
-                <Picker.Item label="Absent" value="absent" />
-                <Picker.Item label="Excused" value="excused" />
-            </Picker>
-            <TouchableOpacity style={styles.button} onPress={handleAttendanceSubmit}>
-              <Text style={styles.buttonText}>Submit</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-          {loadingAttendance ? (
-            <ActivityIndicator size="small" color="#2CBFAE" />
-          ) : (
-            attendanceList && <Text style={styles.attendanceList}>{attendanceList}</Text>
-          )}
       </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-   container: {
+  container: {
     flex: 1,
+    padding: 20,
     backgroundColor: '#E0E7E9',
+     paddingTop: 50,
   },
-  contentContainer: {
-    width: '90%', // Responsive width
-    margin: 20, // Add margin
+    header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#354649', // Dark grey for contrast
+    textAlign: 'center'
+    },
+  formContainer: {
     backgroundColor: 'white',
     padding: 20,
-    borderRadius: 10, // Add border radius
-     // Add shadow for better UI
-    ...Platform.select({ // Platform-specific shadows
-      ios: {
-        shadowColor: 'rgba(0, 0, 0, 0.2)',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.8,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
+    borderRadius: 8,
+      width: '90%', // Use percentages for responsiveness
+    maxWidth: 500,   // Limit maximum width
+     shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+    shadowRadius: 4,
+      elevation: 3, // For Android shadow
+     alignSelf: 'center'
   },
-  header: {
-    backgroundColor: '#2CBFAE',
-    padding: 20,
-    textAlign: 'center',
-    color: 'white',
-    fontSize: 24,
-    borderRadius: 10, // Add to match container
-    marginBottom: 20
-  },
-  courseInfo: {
-    marginBottom: 20, // Consistent spacing
-  },
-  courseInfoHeader: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  courseName: {
+  label: {
     fontSize: 16,
     marginBottom: 5,
-  },
-  classroom: {
-    fontSize: 16,
-  },
-  attendanceSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-around', // Space out buttons evenly
-    marginBottom: 20, // Add spacing before form
-  },
-    activeButton: {
-    backgroundColor: '#4CAF50', // A different color for active state
+    color: '#333',
   },
   button: {
-    padding: 10,
-    margin: 5, // Consistent margin
-    borderWidth: 0,
     backgroundColor: '#2CBFAE',
-    color: 'white',
+    padding: 15,
     borderRadius: 5,
-  },
-  buttonText: {
-    color: 'white',
-    textAlign: 'center', // Ensure text is centered
-      fontSize: 16,
-    fontWeight: 'bold'
-
-  },
-  form: {
-    marginBottom: 20, // Add space above attendance list
-  },
-  formLabel: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  picker: {
-    height: 50,
-    width: '100%',
     marginBottom: 10,
-     borderWidth: 1,      // Add border
-    borderColor: '#ddd', // Light grey border
-    borderRadius: 5,     // Rounded corners
+      alignItems: 'center'
   },
-   attendanceList: {
-    marginTop: 10,
-    padding: 10,
-    borderColor: '#ddd', // Light grey border
-    borderWidth: 1,
-    borderRadius: 5,
-      whiteSpace: 'pre-wrap', // Preserve newlines and spacing
-  },
-  loadingContainer: {
+    backButton: {
+      backgroundColor: '#808080', // Or any color you prefer for a "cancel/back" action.
+      padding: 15,
+      borderRadius: 5,
+      alignItems: 'center'
+    },
+    buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center' // Center the button text.
+    },
+    loadingContainer: { // Add loading container styles
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
+    backgroundColor: '#E0E7E9'
+  }
 
+});
+//Separate style for picker, due to react-native-picker-select's styling limitations.
+const pickerSelectStyles = StyleSheet.create({
+  inputIOS: { // Style for iOS
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    color: 'black',
+    paddingRight: 30, // to ensure the text is never behind the icon
+    marginBottom: 20,
+     textAlign: 'center',
+     zIndex: 99,
+  },
+  inputAndroid: { // Style for Android
+    fontSize: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    color: 'black',
+    marginBottom: 20,
+     textAlign: 'center'
+  },
 });
 
 export default AttendancePage;
