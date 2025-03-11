@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native'; // Import Image
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { BarCodeScanner } from 'expo-barcode-scanner'; // Import BarCodeScanner
+
 
 const QrCodePage: React.FC = () => {
   const { courseId } = useLocalSearchParams<{ courseId?: string }>();

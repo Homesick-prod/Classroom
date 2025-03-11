@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // Import useRef
 import {
   View,
   Text,
@@ -6,13 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Image
+  Image,
+  Platform
 } from 'react-native';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { getDatabase, ref, onValue, remove } from 'firebase/database';
-import { initializeApp } from 'firebase/app';
+//import { initializeApp } from 'firebase/app'; // REMOVE: Initialized in firebase.ts
 import { useRouter } from 'expo-router';
-import app from './firebase';
+import app from './firebase';  // Import correctly
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { faPlus, faQrcode, faQuestion, faCheckSquare, faEdit, faTrash, faArrowRight, faBars, faUserEdit, faSignOutAlt } from '@fortawesome/free-solid-svg-icons';
@@ -38,6 +39,8 @@ const Dashboard: React.FC<Props> = () => {
   const router = useRouter();
   const auth = getAuth(app);
   const db = getDatabase(app);
+  const menuRef = useRef<View>(null); // Ref for the menu container
+
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -51,7 +54,7 @@ const Dashboard: React.FC<Props> = () => {
         const unsubscribeCourses = onValue(coursesRef, (snapshot) => {
           if (snapshot.exists()) {
             const coursesData = snapshot.val();
-             // Convert to array
+            // Convert to array
             const coursesArray: Course[] = Object.keys(coursesData).map(key => ({
               courseId: key, // Use the key as courseId
               ...coursesData[key]
@@ -97,71 +100,81 @@ const Dashboard: React.FC<Props> = () => {
 
     const handleDeleteCourse = async (courseId: string) => {
     Alert.alert(
-        "Delete Course",
-        "Are you sure you want to delete this course?",
-        [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Delete",
-                style: "destructive",
-                onPress: async () => {  // Define onPress here
-                    try {
-                        const user = auth.currentUser;
-                        if (!user) {
-                            Alert.alert("Error", "User not signed in.");
-                            return;
-                        }
-                        const courseRef = ref(db, `users/<span class="math-inline">\{user\.uid\}/classroom/</span>{courseId}`);
-                        await remove(courseRef);
-                        // onValue listener will handle updating the UI
+      "Delete Course",
+      "Are you sure you want to delete this course?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {  // Define onPress here
+            try {
+              const user = auth.currentUser;
+              if (!user) {
+                Alert.alert("Error", "User not signed in.");
+                return;
+              }
+              const courseRef = ref(db, `users/${user.uid}/classroom/${courseId}`);
+              await remove(courseRef);
+              // onValue listener will handle updating the UI
 
-                    } catch (error: any) {
-                        console.error("Error deleting course:", error);
-                        Alert.alert("Error", `Failed to delete course: ${error.message}`);
-                    }
-                }
+            } catch (error: any) {
+              console.error("Error deleting course:", error);
+              Alert.alert("Error", `Failed to delete course: ${error.message}`);
             }
-        ]
+          }
+        }
+      ]
     );
-};
+  };
   const handleGoToCourse = (courseId: string) => {
-        router.push(`/courseDetail?courseId=${courseId}`);
+      router.push(`/courseDetail?courseId=${courseId}`);
   };
   const handleAddCourse = () => {
-        router.push('/addcourse');
+      router.push('/addCourse');
   }
     const handleQuestion = (courseId: string) => {
-      router.replace(`/askQuestion?=${courseId}`);
+    router.replace(`/askQuestion?=${courseId}`);
     };
     const handleEditCourse = (courseId: string) => {
-      router.push(`/editCourse?courseId=${courseId}`); 
+    router.push(`/editCourse?courseId=${courseId}`);
   };
     const handleAttendance = (courseId: string) => {
-       router.push(`/attendance?courseId=${courseId}`);
+      router.push(`/attendance?courseId=${courseId}`);
     };
     const handleQRCode = (courseId: string) => {
-      router.push(`/qrCode?courseId=${courseId}`);
-  };
-  
+      router.replace(`/qrCode?courseId=${courseId}`); // CORRECT - passing the parameter
+    };
 
-  useEffect(() => {
-        const handleClickOutside = (event: any) => { // Use type any for compatibility
-            if (showMenu && ! (event.target as HTMLElement).closest('.menu-container')) {
-                setShowMenu(false);
-            }
-        };
-
-        if (showMenu) {  // Only add the listener *if* the menu is open
-            document.addEventListener('click', handleClickOutside);
+ useEffect(() => {
+    const handleClickOutside = (event: any) => {
+        // Check if the click is outside the menu
+        if (showMenu && menuRef.current && !menuRef.current.contains(event.target as Node)) {
+            setShowMenu(false);
         }
+    };
 
-        return () => {  // Cleanup: remove the listener
-            document.removeEventListener('click', handleClickOutside);
-        };
-    }, [showMenu]);
+    // Listen for clicks on the window (for web) or on the root view (for native)
+    const eventTarget: EventTarget = Platform.OS === 'web' ? window : menuRef.current;
 
+    if (showMenu) {
+       if (Platform.OS === 'web') {
+            document.addEventListener('click', handleClickOutside); // Use document for web
+        } else {
+           //For React Native, use a different approach
+            //We cannot directly add a click listener to the entire screen.
+            //Instead, we rely on the wrapping <TouchableWithoutFeedback> in the render method.
+        }
+    }
 
- if (loading) {
+    return () => {
+        if (Platform.OS === 'web') {
+        document.removeEventListener('click', handleClickOutside); // Cleanup for web
+        }
+    };
+}, [showMenu]);  // Depend on showMenu
+
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <Text>Loading...</Text>
@@ -173,11 +186,17 @@ const Dashboard: React.FC<Props> = () => {
     <ScrollView style={styles.container}>
         <View style={styles.header}>
             <Text style={styles.headerText}>Dashboard</Text>
-                <View style={styles.menuContainer}>
+                <View style={styles.menuContainer} ref={menuRef}>
                     <TouchableOpacity style={styles.menuButton} onPress={toggleMenu}>
                         <FontAwesomeIcon icon="bars" size={24} color="#2cbfae" />
                     </TouchableOpacity>
-                    <View  style={[styles.dropdownMenu, showMenu ? styles.show : null]}>
+
+
+                </View>
+
+        </View>
+
+        <View  style={[styles.dropdownMenu, showMenu ? styles.show : null]}>
                         <TouchableOpacity  style={styles.dropdownButton} onPress={() => router.replace('/editProfile')}>
                             <FontAwesomeIcon icon={faUserEdit} size={20}  />
                             <Text style={styles.dropdownButtonText}>Edit Profile</Text>
@@ -191,10 +210,6 @@ const Dashboard: React.FC<Props> = () => {
                             <Text style={styles.dropdownButtonText}>Logout</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
-        </View>
-
-
       <View style={styles.profileSection}>
         <Text style={styles.profileText}>Name: {userName}</Text>
         <Text style={styles.profileText}>Email: {userEmail}</Text>
@@ -229,19 +244,19 @@ const Dashboard: React.FC<Props> = () => {
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.button, styles.attendanceButton]} onPress={() => handleAttendance(course.courseId)}>
                   <FontAwesomeIcon icon={faCheckSquare} size={20} color="white" />
-                   <Text style={styles.buttonText}>Attendance</Text>
+                  <Text style={styles.buttonText}>Attendance</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.button, styles.editButton]} onPress={() => handleEditCourse(course.courseId)}>
                   <FontAwesomeIcon icon={faEdit} size={20} color="white" />
-                   <Text style={styles.buttonText}>Edit</Text>
+                    <Text style={styles.buttonText}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={() => handleDeleteCourse(course.courseId)}>
                   <FontAwesomeIcon icon={faTrash} size={20} color="white" />
-                   <Text style={styles.buttonText}>Delete</Text>
+                    <Text style={styles.buttonText}>Delete</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.button, styles.goToCourseButton]} onPress={() => handleGoToCourse(course.courseId)}>
                   <FontAwesomeIcon icon={faArrowRight} size={20} color="white" />
-                   <Text style={styles.buttonText}>Go</Text>
+                    <Text style={styles.buttonText}>Go</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -273,16 +288,15 @@ const styles = StyleSheet.create({
   headerText: {
     color: 'white',
     fontSize: 24,
-     textAlign: 'center',
+      textAlign: 'center',
     fontWeight: 'bold',
   },
-    profileSection: {
+  profileSection: {
     display: 'flex',
+    position: 'relative',
     alignItems: 'flex-end',
     padding: 16,
-    borderBottomWidth: 1,
     zIndex: 10,
-    borderBottomColor: '#ccc',
   },
   profileText: {
     fontSize: 16,
@@ -328,7 +342,7 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         borderRadius: 8,
     },
-     noImageContainer: {
+    noImageContainer: {
         width: '100%',
         height: 200,
         backgroundColor: '#ddd',
@@ -340,7 +354,7 @@ const styles = StyleSheet.create({
     noImageText: {
         color: '#666',
     },
- buttonContainer: {
+  buttonContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap', // Allow buttons to wrap
     justifyContent: 'space-between', // Space out buttons
@@ -349,11 +363,11 @@ const styles = StyleSheet.create({
   button: {
     padding: 10,
     borderRadius: 5,
-    marginBottom: 10,       // Space between rows
+    marginBottom: 10,      // Space between rows
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '30%',        // ~30% width for 3 columns
+    width: '30%',         // ~30% width for 3 columns
   },
     buttonText: {
     color: 'white',
@@ -387,44 +401,46 @@ const styles = StyleSheet.create({
         position: 'absolute', // Absolute positioning
         top: 24,            // Adjust as needed
         left: 20,           // Adjust as needed
-        zIndex: 100,          // Ensure menu is above other content
+        zIndex: 100,            // Ensure menu is above other content
     },
 
     menuButton: {
-        backgroundColor: '#ffffff',
+      backgroundColor: '#ffffff',
         borderWidth: 0, // Remove border
         fontSize: 24,
         color: '#2cbfae',
         cursor: 'pointer',
         borderRadius: 5, // Add if you want rounded corners
-        padding: 5,   // Add padding to make it easier to tap
+        padding: 5,  // Add padding to make it easier to tap
         // Add other styles as needed
     },
 
     dropdownMenu: {
-        display: 'none',    // Hidden by default
+        display: 'none',      // Hidden by default
         position: 'absolute',
         backgroundColor: 'white',
         boxShadow: '0px 8px 16px 0px rgba(0,0,0,0.2)',
-        minWidth: 160,       // Adjust as needed
-        zIndex: 2000,          // Ensure it's above other content
-        borderRadius: 5,       // Rounded corners
-        top: 40,             // Position below the menu button (adjust as needed)
-        left: 0,
+        minWidth: 250,      // Adjust as needed
+        zIndex: 2000,               // Ensure it's above other content
+        borderRadius: 5,        // Rounded corners
+        top: 72,            // Adjust as needed
+        left: 20,           // Adjust as needed
+        zIndex: 100,
         flexDirection: 'column',
-        width: 150,       // Example width, adjust as needed
+        width: 150,      // Example width, adjust as needed
         // Add other styles as needed
     },
-     dropdownButton: {
-        width: '100%', // Take up full width of the dropdown
-        padding: 12,  // Vertical padding
-        borderWidth: 0, // Remove border
-        backgroundColor: 'transparent',
-        textAlign: 'left', // Align text to the left
-        cursor: 'pointer', // Show pointer cursor on hover
-        flexDirection: 'row'
+    dropdownButton: {
+      width: '100%', // Take up full width of the dropdown
+      padding: 12,  // Vertical padding
+      borderWidth: 0, // Remove border
+      backgroundColor: 'transparent',
+      textAlign: 'left', // Align text to the left
+      cursor: 'pointer', // Show pointer cursor on hover
+      flexDirection: 'row'
     },
     dropdownButtonText:{
+      paddingLeft:10,
         color: 'black', // Change the color to your preferred color
         fontSize: 16, // Set the font size to your preference
     },

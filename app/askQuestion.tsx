@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getDatabase, ref, push } from 'firebase/database';
@@ -49,8 +48,8 @@ const AskQuestion: React.FC<Props> = () => {
       }
 
       if (!courseId) {
-          Alert("Error", "No course selected.");
-          //router.replace('/dashboard')
+          Alert.alert("Error", "No course selected.");
+          router.replace('/dashboard')
           return;
       }
 
@@ -64,7 +63,7 @@ const AskQuestion: React.FC<Props> = () => {
       });
 
       Alert.alert('Success', 'Your question has been submitted successfully!');
-      //router.replace('/dashboard') // Go back to the previous screen (likely the course detail)
+      router.replace('/dashboard') // Go back to the previous screen (likely the course detail)
 
 
     } catch (error:any) {
