@@ -7,7 +7,7 @@ import {
   Alert,
   ScrollView,
   Platform,
-  ActivityIndicator // Import ActivityIndicator
+  ActivityIndicator
 } from 'react-native';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { getDatabase, ref, set, get } from 'firebase/database'; // Remove onValue (not needed here)
@@ -77,7 +77,7 @@ const AttendancePage: React.FC<Props> = () => {
       }
 
       const today = new Date().toISOString().split('T')[0];
-      const attendanceRef = ref(db, `attendances/${courseId}/${today}/${user.uid}`);
+      const attendanceRef = ref(db, `attendances/${courseId}/${today}/${user.uid}`); // **CORRECT PATH**
       await set(attendanceRef, {
         status: attendanceStatus,
         timestamp: new Date().toISOString(),
@@ -85,6 +85,7 @@ const AttendancePage: React.FC<Props> = () => {
       });
 
       Alert.alert('Success', 'Attendance recorded successfully!');
+      router.back(); // Add this line to go back after submission
     } catch (error: any) {
       console.error('Error submitting attendance:', error);
       Alert.alert('Error', `Failed to submit attendance: ${error.message}`);
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#E0E7E9',
-     paddingTop: 50,
+      paddingTop: 50,
   },
     header: {
     fontSize: 24,
@@ -156,12 +157,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
       width: '90%', // Use percentages for responsiveness
     maxWidth: 500,   // Limit maximum width
-     shadowColor: '#000',
+      shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
     shadowRadius: 4,
       elevation: 3, // For Android shadow
-     alignSelf: 'center'
+      alignSelf: 'center'
   },
   label: {
     fontSize: 16,
@@ -207,8 +208,8 @@ const pickerSelectStyles = StyleSheet.create({
     color: 'black',
     paddingRight: 30, // to ensure the text is never behind the icon
     marginBottom: 20,
-     textAlign: 'center',
-     zIndex: 99,
+      textAlign: 'center',
+      zIndex: 99,
   },
   inputAndroid: { // Style for Android
     fontSize: 16,
@@ -219,7 +220,7 @@ const pickerSelectStyles = StyleSheet.create({
     borderRadius: 5,
     color: 'black',
     marginBottom: 20,
-     textAlign: 'center'
+      textAlign: 'center'
   },
 });
 

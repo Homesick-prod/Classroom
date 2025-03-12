@@ -225,13 +225,8 @@ const Dashboard: React.FC<Props> = () => {
             <View key={course.courseId} style={styles.courseContainer}>
               <Text style={styles.courseTitle}>{course.name}</Text>
               <Text style={styles.courseClassroom}>Classroom: {course.classroom}</Text>
-              {/* Display Image with default */}
-              {course.image ? (
-                <Image source={{ uri: course.image }} style={styles.courseImage} />
-              ) : (
-                <View style={styles.noImageContainer}>
-                  <Text style={styles.noImageText}>No Image</Text>
-                </View>
+              {course.image &&(
+                <Image source={{ uri:course.image}}style={styles.courseImage} />
               )}
 
               <View style={styles.buttonContainer}>

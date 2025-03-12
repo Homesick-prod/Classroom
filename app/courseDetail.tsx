@@ -39,12 +39,21 @@ interface Question { //Define interface for question
     timestamp: string;
 }
 
+interface ForumPost {
+    title: string;
+    content: string;
+    author: string;
+    timestamp: number;
+}
+
+
 const CourseDetail: React.FC = () => {
   const { courseId } = useLocalSearchParams<{ courseId?: string }>();
   const [courseData, setCourseData] = useState<CourseData | null>(null);
   const [activeTab, setActiveTab] = useState<'stream' | 'question' | 'people'>('stream');
-    const [people, setPeople] = useState<Record<string, Person>>({});  // Store people as an object
+    const [people, setPeople] = useState<Record<string, Person>>({});  // Store people as an object
     const [questions, setQuestions] = useState<Record<string,Question>>({});
+    const [forumPosts, setForumPosts] = useState<Record<string, ForumPost>>({}); // Add forum posts state
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const auth = getAuth(app);
@@ -58,7 +67,7 @@ const CourseDetail: React.FC = () => {
         }
 
         const courseRef = ref(db, `courses/${courseId}`); // Assuming courses are directly under 'courses'
-         try {
+        try {
             const snapshot = await get(courseRef);
             if (snapshot.exists()) {
                 setCourseData(snapshot.val());
@@ -77,16 +86,16 @@ const CourseDetail: React.FC = () => {
     const peopleRef = ref(db, `people/${courseId}`);
       try {
           const snapshot = await get(peopleRef); // Use onValue for real-time updates
-            if (snapshot.exists()) {
+          if (snapshot.exists()) {
             setPeople(snapshot.val());
-            } else {
+          } else {
             setPeople({}); // No people in this course
-            }
+          }
 
-        } catch(error: any) {
-            console.error("Error fetching people:", error);
-            Alert.alert("Error", `Failed to load people data: ${error.message}`);
-        }
+      } catch(error: any) {
+          //console.error("Error fetching people:", error);
+          //Alert.alert("Error", `Failed to load people data: ${error.message}`);
+      }
 
   }, [courseId, db]);
 
@@ -106,6 +115,26 @@ const CourseDetail: React.FC = () => {
           Alert.alert("Error", `Failed to load question data: ${error.message}`);
       }
   }, [courseId, db])
+
+    const loadForumPosts = useCallback(async () => {
+        if (!courseId) return;
+
+        const forumRef = ref(db, `forum/${courseId}`);
+        try {
+            const snapshot = await get(forumRef);  //Use get() one-time
+            if (snapshot.exists()) {
+                setForumPosts(snapshot.val());
+            } else {
+                setForumPosts({}); // No forum posts
+            }
+        } catch (error: any) {
+           console.error("Error fetching forum posts", error);
+           Alert.alert("Error", `Failed to load forum posts: ${error.message}`);
+        }
+
+    }, [courseId, db]);
+
+
 
     const editPerson = (personId: string) => {
         if(!courseId) return;
@@ -127,7 +156,7 @@ const CourseDetail: React.FC = () => {
                             const personRef = ref(db, `people/<span class="math-inline">\{courseId\}/</span>{personId}`);
                             await remove(personRef);
                             // You could reload people here, but onValue will handle it
-                             Alert.alert("Success", "Deleted")
+                              Alert.alert("Success", "Deleted")
                         } catch (error: any) {
                             console.error("Error deleting person:", error);
                             Alert.alert("Error", `Failed to delete person: ${error.message}`);
@@ -139,8 +168,8 @@ const CourseDetail: React.FC = () => {
         )
 
     };
-     const editQuestion = (questionId: string) => {
-         if(!courseId) return;
+      const editQuestion = (questionId: string) => {
+          if(!courseId) return;
         router.push(`/editWork?courseId=<span class="math-inline">\{courseId\}&questionId\=</span>{questionId}`);
     };
 
@@ -148,25 +177,25 @@ const CourseDetail: React.FC = () => {
     const deleteQuestion = async (questionId: string) => {
         if(!courseId) return;
       Alert.alert(
-          "Delete Question",
-          "Are you sure you want to delete this question?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async() => {
-                        try {
-                            const questionRef = ref(db, 'questions/' + courseId + '/' + questionId);
-                            await remove(questionRef);
-                            // onValue will handle updating the UI
-                        } catch (error: any) {
-                            console.error('Error deleting question:', error);
-                            Alert.alert("Error",`Error deleting question: ${error.message}`);
-                        }
-                    }
-                }
-            ]
+        "Delete Question",
+        "Are you sure you want to delete this question?",
+          [
+              { text: "Cancel", style: "cancel" },
+              {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: async() => {
+                      try {
+                          const questionRef = ref(db, 'questions/' + courseId + '/' + questionId);
+                          await remove(questionRef);
+                          // onValue will handle updating the UI
+                      } catch (error: any) {
+                          console.error('Error deleting question:', error);
+                          Alert.alert("Error",`Error deleting question: ${error.message}`);
+                      }
+                  }
+              }
+          ]
       )
     };
 
@@ -185,13 +214,14 @@ const CourseDetail: React.FC = () => {
             fetchCourseData();
             loadPeople();
             loadQuestion();
+            loadForumPosts(); // Load forum posts
         }
 
 
     return () => {
       unsubscribe(); // Cleanup auth listener
     };
-  }, [auth, courseId, router, fetchCourseData, loadPeople, loadQuestion]); // Include courseId in dependencies
+  }, [auth, courseId, router, fetchCourseData, loadPeople, loadQuestion, loadForumPosts]); // Include loadForumPosts
 
   const handleAddPeople = () => {
       if (!courseId) return; // Ensure courseId is available
@@ -200,6 +230,11 @@ const CourseDetail: React.FC = () => {
   const handleAddQuestion = () => {
         if (!courseId) return; // Ensure courseId is available
         router.push(`/askQuestion?courseId=${courseId}`);
+  }
+
+  const handleAddForumPost = () => {
+    if (!courseId) return;
+    router.push(`/addForumPost?courseId=${courseId}`);
   }
 
   if (loading) {
@@ -221,9 +256,6 @@ const CourseDetail: React.FC = () => {
         <TouchableOpacity onPress={() => setActiveTab('question')}>
           <Text style={[styles.tab, activeTab === 'question' && styles.activeTab]}>Question</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab('people')}>
-          <Text style={[styles.tab, activeTab === 'people' && styles.activeTab]}>People</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Content based on active tab */}
@@ -240,13 +272,31 @@ const CourseDetail: React.FC = () => {
           ) : (
             <Text>Course data not found.</Text>
           )}
-             <TouchableOpacity style={styles.button} onPress={handleAddQuestion}>
-                <FontAwesomeIcon icon={faPlus} size={20} color="white" />
-                <Text style={styles.buttonText}>  Add Question</Text>
-            </TouchableOpacity>
-             <TouchableOpacity style={styles.button} onPress={() => router.back()}>
-                <Text style={styles.buttonText}>Go Back</Text>
-            </TouchableOpacity>
+
+        {/* Display Forum Posts */}
+        <View style={styles.forumSection}>
+            <Text style={styles.sectionHeader}>Forum Posts</Text>
+            {Object.keys(forumPosts).length > 0 ? (
+                Object.entries(forumPosts).map(([postId, post]) => (
+                <View key={postId} style={styles.forumPostItem}>
+                    <Text style={styles.forumPostTitle}>{post.title}</Text>
+                    <Text style={styles.forumPostContent}>{post.content}</Text>
+                    <Text style={styles.forumPostAuthor}>
+                    Posted by: {post.author} on {new Date(post.timestamp).toLocaleString()}
+                    </Text>
+                </View>
+            ))
+            ) : (
+            <Text>No forum posts yet.</Text>
+           )}
+        </View>
+            <TouchableOpacity style={styles.button} onPress={handleAddQuestion}>
+              <FontAwesomeIcon icon={faPlus} size={20} color="white" />
+              <Text style={styles.buttonText}>  Add Question</Text>
+          </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+              <Text style={styles.buttonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -274,23 +324,23 @@ const CourseDetail: React.FC = () => {
             <Text style={styles.sectionHeader}>People</Text>
           {/* Display People in the Course */}
           {Object.keys(people).length > 0 ? (
-              Object.entries(people).map(([personId, person]) => (
-                <View key={personId} style={styles.personItem}>
-                    <Text style={styles.personName}>{person.name}</Text>
-                    <Text style={styles.personEmail}>Email: {person.email || 'Not provided'}</Text>
-                     <View style={styles.personActions}>
-                        <TouchableOpacity style={[styles.button, styles.editButton]} onPress={()=>editPerson(personId)}>
-                            <FontAwesomeIcon icon={faEdit} size={20} color="white"/>
-                            <Text style={styles.buttonText}>Edit</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity  style={[styles.button, styles.deleteButton]} onPress={()=>deletePerson(personId)}>
-                             <FontAwesomeIcon icon={faTrash} size={20} color="white"/>
-                            <Text style={styles.buttonText}>Delete</Text>
-                        </TouchableOpacity>
-                     </View>
-                </View>
+            Object.entries(people).map(([personId, person]) => (
+              <View key={personId} style={styles.personItem}>
+                  <Text style={styles.personName}>{person.name}</Text>
+                  <Text style={styles.personEmail}>Email: {person.email || 'Not provided'}</Text>
+                  <View style={styles.personActions}>
+                    <TouchableOpacity style={[styles.button, styles.editButton]} onPress={()=>editPerson(personId)}>
+                        <FontAwesomeIcon icon={faEdit} size={20} color="white"/>
+                        <Text style={styles.buttonText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity  style={[styles.button, styles.deleteButton]} onPress={()=>deletePerson(personId)}>
+                        <FontAwesomeIcon icon={faTrash} size={20} color="white"/>
+                        <Text style={styles.buttonText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+              </View>
 
-              ))
+            ))
           ) : (
             <Text>No people added to this course yet.</Text>
           )}
@@ -344,7 +394,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#666',
     marginBottom: 20,
-      textAlign: 'center'
+        textAlign: 'center'
   },
     courseImage: {
         width: '100%', // or a specific width
@@ -376,7 +426,7 @@ const styles = StyleSheet.create({
         textAlign: 'center'
 
     },
-     addPeopleButton: {
+      addPeopleButton: {
     backgroundColor: '#5C6BC0',
     // Other styles
   },
@@ -450,8 +500,8 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 5,
-     borderBottomWidth: 1,
-     borderBottomColor: '#ddd',
+      borderBottomWidth: 1,
+      borderBottomColor: '#ddd',
     },
     questionTitle: {
       fontSize: 16,
@@ -473,15 +523,41 @@ const styles = StyleSheet.create({
           backgroundColor: '#2CBFAE', // Example color, change as needed
           marginRight: 5,
       },
-  
+
     deleteButton: {
-          backgroundColor: '#f44336', // Example color (red), change as needed
-    },
+        backgroundColor: '#f44336', // Example color (red), change as needed
+  },
       loadingContainer: { // Style for loading indicator
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-      },
-  });
-  
-  export default CourseDetail;
+    },
+    forumSection: {
+        marginTop: 20,
+        padding: 10,
+        backgroundColor: '#EEF1F0FF',
+        borderRadius: 8,
+    },
+  forumPostItem: {
+        backgroundColor: '#fff',
+        padding: 10,
+        marginBottom: 10,
+        borderRadius: 5,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ddd',
+    },
+    forumPostTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    forumPostContent: {
+         fontSize: 14,
+    },
+    forumPostAuthor: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 4
+    }
+});
+
+export default CourseDetail;
